@@ -1,0 +1,10 @@
+.idea/
+.claude/
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+nul

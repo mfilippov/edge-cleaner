@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Test
+        run: dotnet test --configuration Release
+
+      - name: Publish
+        run: >
+          dotnet publish src/EdgeCleaner/EdgeCleaner.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          --output publish
+
+      - name: Rename binary
+        run: mv publish/EdgeCleaner.exe EdgeCleaner-${{ matrix.rid }}.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EdgeCleaner-${{ matrix.rid }}
+          path: EdgeCleaner-${{ matrix.rid }}.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "EdgeCleaner $TAG" \
+            --generate-notes \
+            artifacts/EdgeCleaner-win-x64.exe \
+            artifacts/EdgeCleaner-win-arm64.exe
